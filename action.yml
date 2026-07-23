@@ -1,0 +1,97 @@
+name: 'bedrock build'
+description: 'Build a release Android APK/AAB with bedrock — no Android SDK on the runner'
+author: 'bedrock'
+
+branding:
+  icon: 'box'
+  color: 'gray-dark'
+
+inputs:
+  api-token:
+    description: 'A bedrock API token (bedrock token create --name "GitHub Actions"), passed as a repo secret'
+    required: true
+  profile:
+    description: 'debug or release'
+    required: false
+    default: 'release'
+  aab:
+    description: 'Build an Android App Bundle instead of an APK'
+    required: false
+    default: 'false'
+  version:
+    description: 'Pin a specific bedrock CLI version instead of installing the latest'
+    required: false
+    default: ''
+
+outputs:
+  build-id:
+    description: 'The build ID'
+    value: ${{ steps.build.outputs.build-id }}
+  status:
+    description: 'success, failed, or canceled'
+    value: ${{ steps.build.outputs.status }}
+  download-url:
+    description: 'Presigned URL for the built APK/AAB (only set when status is success)'
+    value: ${{ steps.build.outputs.download-url }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install bedrock CLI
+      shell: bash
+      env:
+        BEDROCK_VERSION: ${{ inputs.version }}
+      run: curl -fsSL https://pub-23076c351b4c45618532bf7f9c32c316.r2.dev/install.sh | sh
+
+    - name: Authenticate
+      shell: bash
+      run: |
+        mkdir -p "$HOME/.bedrock"
+        printf '%s' "${{ inputs.api-token }}" > "$HOME/.bedrock/credentials"
+        chmod 600 "$HOME/.bedrock/credentials"
+
+    - name: Build
+      id: build
+      shell: bash
+      run: |
+        args=(--profile "${{ inputs.profile }}" --json)
+        if [ "${{ inputs.aab }}" = "true" ]; then
+          args+=(--aab)
+        fi
+
+        log="$RUNNER_TEMP/bedrock-build.log"
+        set +e
+        "$HOME/.bedrock/bin/bedrock" build "${args[@]}" | tee "$log"
+        build_exit="${PIPESTATUS[0]}"
+        set -e
+
+        result_line="$(grep -m1 '^bedrock-build-result:' "$log" || true)"
+        if [ -z "$result_line" ]; then
+          echo "::error::bedrock build produced no result line — see the log above"
+          exit "${build_exit:-1}"
+        fi
+        result_json="${result_line#bedrock-build-result:}"
+
+        build_id="$(echo "$result_json" | jq -r '.build_id')"
+        status="$(echo "$result_json" | jq -r '.status')"
+        download_url="$(echo "$result_json" | jq -r '.download_url // empty')"
+        error_message="$(echo "$result_json" | jq -r '.error_message // empty')"
+
+        {
+          echo "build-id=$build_id"
+          echo "status=$status"
+          echo "download-url=$download_url"
+        } >> "$GITHUB_OUTPUT"
+
+        {
+          echo "## bedrock build"
+          echo
+          echo "| | |"
+          echo "|---|---|"
+          echo "| Build ID | \`$build_id\` |"
+          echo "| Status | $status |"
+          [ -n "$download_url" ] && echo "| Download | [APK/AAB]($download_url) |"
+          [ -n "$error_message" ] && echo "| Error | $error_message |"
+        } >> "$GITHUB_STEP_SUMMARY"
+
+        exit "$build_exit"
