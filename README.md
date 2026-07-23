@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: <owner>/github-action@v1
+      - uses: ThembinkosiThemba/bedrock-github-action@v1
         with:
           api-token: ${{ secrets.BEDROCK_API_TOKEN }}
 ```
@@ -50,7 +50,7 @@ status, and download link, so the result is visible without opening logs.
 ## Using the outputs
 
 ```yaml
-      - uses: <owner>/github-action@v1
+      - uses: ThembinkosiThemba/bedrock-github-action@v1
         id: bedrock
         with:
           api-token: ${{ secrets.BEDROCK_API_TOKEN }}
