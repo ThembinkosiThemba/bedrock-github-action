@@ -1,6 +1,6 @@
 # bedrock/github-action
 
-GitHub Action for [bedrock](https://bedrock.searchhq.org) — builds a release
+GitHub Action for [bedrock](https://bedrock.mkhonta.com) — builds a release
 Android APK/AAB with no Android SDK, emulator, or queue behind other
 customers' builds. This action installs the `bedrock` CLI, authenticates
 with a token you provide, and runs `bedrock build`.
